@@ -1,2 +1,6 @@
-code_sample_sept14
-==================
+# This is a code sample repo
+
+## Code sample includes
+    - R
+    - Python
+    - Scala
