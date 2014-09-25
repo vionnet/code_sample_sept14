@@ -1,0 +1,90 @@
+---
+title: 'ToothGrowth Data Analysis'
+output: pdf_document
+---
+From data summary and counting below, we see that the ToothGrowth data has 3 columns.
+The supp column has 2 values, each with 30 observations.
+```{r, echo=TRUE, message = F}
+library(datasets)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+data(ToothGrowth)
+summary(ToothGrowth)
+```
+The dose column has 3 values, each with 20 observations.
+```{r, echo=FALSE, message = F}
+unique(ToothGrowth$dose)
+c(nrow(ToothGrowth[which(ToothGrowth$dose==0.5),]),
+  nrow(ToothGrowth[which(ToothGrowth$dose==1.0),]),
+  nrow(ToothGrowth[which(ToothGrowth$dose==2.0),]))
+```
+Plot below suggests that as dose increases, tooth lengths also increase for each supplement. 
+It is hard to tell from the plot about the relationship between tooth lengths and supplements.
+
+```{r, echo=FALSE, fig.width=6, fig.height=3, message =FALSE, results='hide'}
+#compare len by supp for each dose
+require(ggplot2)
+ggplot(ToothGrowth, aes(dose, len)) +
+       geom_point(aes(color = supp),size = 4, alpha = 1/2)+
+       facet_grid(.~ supp) +
+       labs(x = "Dose") +
+       labs(y = "Tooth Length")
+       labs(title = "Compare Tooth Lengths")
+```
+
+The tooth lengths variance for each dose (0.5, 1.0, 2.0) are as follows: 
+```{r, echo=FALSE, message = FALSE}
+c(var((ToothGrowth[which(ToothGrowth$dose==0.5),])$len), 
+  var((ToothGrowth[which(ToothGrowth$dose==1.0),])$len), 
+  var((ToothGrowth[which(ToothGrowth$dose==2.0),])$len))
+```
+
+The tooth lengths variance for each supplement ("OJ", "VC") are as follows: 
+```{r, echo=FALSE, message = F}
+c(var((ToothGrowth[which(ToothGrowth$supp=="OJ"),])$len), 
+  var((ToothGrowth[which(ToothGrowth$supp=="VC"),])$len))
+```
+
+We see that the variances for different doses appear to be different from one another,
+also the variances for different supplements appear to be different from one other.
+
+- Not knowing the significance of their differences, let us assume that the variances are different. 
+- Assume that there is no overlap between dose and supplement groups, and that dose level and supplement were randomly assigned to test subjects. We use the unpaired t-test.
+- Sample sizes are 20 and 30 for each does and for each supplement, respectively. Both are bigger than 15, so we can assume that the sample means are normally distributed.
+
+Under assumptions above, we perform unequal variance independent T test.
+
+- Comparing the difference in means for the two supplements, we obtain a p-value 
+  greater than the significance level 0.05. Therefore, there is not enough difference
+  in the samples to conclude a difference in means. Moreover, the $95\%$ confidence interval 
+  below contains 0. Thus we can not reject the null hypothesis that the difference in
+  means is equal to 0.
+```{r, echo=TRUE}
+t.test(len ~ supp, paired = FALSE, var.equal = FALSE, data = ToothGrowth)$p.value
+t.test(len ~ supp, paired = FALSE, var.equal = FALSE, data = ToothGrowth)$conf.int
+```
+- Comparing the difference in means for the 3 doses by comparing two at a time. 
+All three p-values from tests below are very small. We can reject the null hypothesis 
+that the there is no difference in means. This suggests that dose amount is significant to tooth length.
+
+```{r, echo=FALSE}
+tg_d12 <- subset(ToothGrowth, dose %in% c(0.5,1.0))
+tg_d23 <- subset(ToothGrowth, dose %in% c(1.0,2.0))
+tg_d13 <- subset(ToothGrowth, dose %in% c(0.5,2.0))
+
+rbind(c("0.5 to 1.0 p-value", "1.0 to 2.0 p-value", "0.5 to 2.0 p-value"), 
+      c(t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d12)$p.value,
+        t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d23)$p.value,
+        t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d13)$p.value ))
+```
+- Below are confidence intervals for comparing dose 0.5 to 1.0, 
+  dose 1.0 to 2.0, and dose 0.5 to 2.0, respectively. None of the intervals
+  contain 0. We are $95\%$ confident that there are differences in means for all three dose
+  levels.
+```{r, echo=FALSE, message=FALSE}
+t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d12)$conf.int
+t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d23)$conf.int
+t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = tg_d13)$conf.int
+```
+

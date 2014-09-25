@@ -1,0 +1,139 @@
+---
+title: 'Automatic vs Manual Transmission: A Regression Analysis on mtcars Dataset'
+author: "vionnet"
+output: pdf_document
+---
+## Executive Summary
+The purpose of this analysis is to examine whether automatic transmission is better than manual transmission for miles per gallon (MPG) using the mtcars dataset in R. The mtcars dataset is the motor trend car road tests data for $32$ automobiles from the 1974 Motor Trend US magazine. Our analysis on this data shows that on average, the manual transmission performs better than the automatic transmission with $7.24$ more MPGs. After adjusting for confonding variables and interactions between variables, our regression model, which includes transmission, horsepower, weight, and the interaction between transmission and weight as predictors, shows that the manual transmission performs better than the automatic transmission with 
+$11.55$ more MPGs.
+
+There are several limitations to our analysis: the dataset used in analysis only contains $32$ observations. The sample may not be representative. Moreoever, data was extracted from the 1974 magazine. Car performance has improved a lot since then. We may draw a different conclusion if using more recent car performance data.
+```{r, echo=FALSE}
+#Getting packages
+library(datasets)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+data(mtcars)
+#Creating factor variables
+mtcars$am <- factor(mtcars$am,levels=c(0,1), labels=c("Automatic","Manual")) 
+mtcars$gear <- factor(mtcars$gear,levels=c(3,4,5), labels=c("3gears","4gears","5gears")) 
+mtcars$cyl <- factor(mtcars$cyl,levels=c(4,6,8),labels=c("4cyl","6cyl","8cyl")) 
+mtcars$vs <- factor(mtcars$vs,levels=c(0,1), labels=c("V","S"))
+mtcars$carb <- factor(mtcars$carb,levels=c(1,2,3,4,6,8), 
+                      labels=c("1carb","2carb","3carb","4carb","6carb","8carb"))
+
+```
+## Exploratory Data Analysis
+After getting the data, and creating factor variables within the data, we
+perform a few exploratory analysis of the data.
+The "MPG by Transmission Type" boxplots in Appendix show that the median MGP 
+of the automatic transmission is lower than the median, as well as the lower 
+quantile of the MGP of the manual transmission. They also show that the 
+automatic transmission have more consistent MPGs than the manual transmission. 
+The boxplots suggest differences between the two transmission types.
+
+The "Overall MPG Distribution" plot in Appendix shows that MPG is roughly 
+normally distributed. 
+
+We divide the mtcars dataset into two groups based on transmission types. 
+The automatic transmission dataset contains $19$ observations, and the
+manual transmission dataset contains $13$ observations. 
+```{r, echo=FALSE, include=FALSE}
+#Creating separate data sets for auto and manual transmissions
+auto_mtc <- mtcars[which(mtcars$am=="Automatic"),]
+manu_mtc <- mtcars[which(mtcars$am=="Manual"),]
+c(nrow(auto_mtc), nrow(manu_mtc))
+```
+The "Distribution of MPG by Transmission" plot in Appendix shows that MPG is 
+roughly normally distributed for the automatic transmission and somewhat 
+normally distributed for the manual transmission.
+
+From these plots, we assume independent and random sample, normal distribution,
+as well as unequal variance in the two sub-datasets, and perform the 
+Welch two sample t-test. 
+
+```{r, echo=TRUE}
+#Perform the Welch Two Sample t-test
+t.test(mpg ~ am, paired = FALSE, var.equal = FALSE, data = mtcars)
+```
+
+P-value from the above test is small ($<0.05$), hence we reject the null
+hypothesis, and claim that there is a significant difference in means of MPGs
+for the two transmissions. The difference in means is $7.24$ MPGs.
+
+## Model Selection 
+If we only include am in our model, we see from the $R^2$ value that only $36\%$
+of the total variation can be explain by the model. This suggests the existence 
+of confonding variables. 
+```{r, echo=TRUE}
+fit1 <- lm(mpg~am, data=mtcars)
+summary(fit1)$r.squared
+```
+After trials and errors (details omitted due to report length), 
+we find that hp and wt are the confonding variables.
+```{r, echo=FALSE, include=FALSE}
+fit1 <- lm(mpg~am, data=mtcars)
+fit2 <- update(fit1, mpg ~ am + hp)
+fit3 <- update(fit1, mpg ~ am + hp + wt)
+anova(fit1, fit2, fit3)
+```
+
+We would also like to examine potential interactions between am and wt, and
+interactions between am and hp. When incorporating the interaction betwwen am
+and wt into the model, we get that their interaction is somewhat significant
+(p-value is $0.0197 < 0.05$). When incorporating the interaction between 
+am and hp into the model, the ANOVA test shows that it is not significant. 
+
+```{r, echo=FALSE}
+#investigate confonding factors
+fit_model_conf_wt <- lm(mpg ~ am + hp + wt + am*wt, data=mtcars)
+fit_model_conf_wh <- update(fit_model_conf_wt, mpg ~ am + hp + wt + am*wt + am*hp)
+anova(fit_model_conf_wt, fit_model_conf_wh)
+```
+Before settling down on the linear regression model with am, hp, wt, and am*wt 
+as predictors, let us examine its residual plots displayed in the Appendix. 
+From these plots, we see that residuals from the model demostrate 
+homoscedasticity and normality, which are desired results.
+
+Summary below shows that our model explains $87\%$ of the variance. 
+On average, the manual transmission has $11.55$ more MPGs than the automatic
+transmission.
+```{r, echo=FALSE}
+#investigate confonding factors
+fit_model_conf_wt <- lm(mpg ~ am + hp + wt + am*wt, data=mtcars)
+summary(fit_model_conf_wt)
+```
+
+## Appendix
+```{r fig1, fig.cap="Figure 1", echo=FALSE, fig.height=4, fig.width=6}
+qplot(am, mpg, data = mtcars, geom=c("boxplot","jitter"), fill=am)+
+      labs(x = "Transmission Type", cex=0.5) +
+      labs(y = "Miles/(US) gallon", cex=0.5) +
+      labs(title = "MPG by Transmission Type", cex=0.5)
+```
+
+```{r fig2, fig.cap="Figure 2", echo=FALSE, fig.height=4, fig.width=6}
+h <- hist(mtcars$mpg, 
+        xlab="MPGs", ylab="Frequency", 
+        main="Overall MPG Distribution")
+abline(v=mean(mtcars$mpg),col="red",lwd=2) 
+xfit<-seq(min(mtcars$mpg),max(mtcars$mpg),length=60) 
+yfit<-dnorm(xfit,mean=mean(mtcars$mpg),sd=sd(mtcars$mpg)) 
+yfit <- yfit*diff(h$mids[1:2])*length(mtcars$mpg) 
+lines(xfit, yfit, col="purple", lwd=2)
+```
+
+```{r fig3, fig.cap="Figure 3", echo=FALSE, fig.height=4, fig.width=6}
+qplot(mpg, data=mtcars, geom="density", fill=am, alpha=I(.5), 
+               main="Distribution of MPG by Transmission Type", xlab="Miles Per Gallon", 
+               ylab="Density")
+```
+
+
+```{r fig4, fig.cap="Figure 4", echo=FALSE}
+par(mfrow=c(2,2))
+plot(fit_model_conf_wt)
+```
+
+
